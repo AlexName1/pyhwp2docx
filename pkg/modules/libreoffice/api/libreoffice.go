@@ -21,6 +21,7 @@ import (
 type libreOffice interface {
 	gotenberg.Process
 	pdf(ctx context.Context, logger *zap.Logger, inputPath, outputPath string, options Options) error
+	docx(ctx context.Context, logger *zap.Logger, inputPath, outputPath string) error
 }
 
 type libreOfficeArguments struct {
@@ -341,6 +342,58 @@ func (p *libreOfficeProcess) pdf(ctx context.Context, logger *zap.Logger, inputP
 	// of its temporary files, as it has been killed without warning. The
 	// garbage collector will delete them for us (if the module is loaded).
 	return fmt.Errorf("convert to PDF: %w", err)
+}
+
+func (p *libreOfficeProcess) docx(ctx context.Context, logger *zap.Logger, inputPath, outputPath string) error {
+	if !p.isStarted.Load() {
+		return errors.New("LibreOffice not started, cannot handle DOCX conversion")
+	}
+
+	args := []string{
+		"--no-launch",
+		"--format",
+		"docx",
+	}
+
+	args = append(args, "--port", fmt.Sprintf("%d", p.socketPort))
+
+	checkedEntry := logger.Check(zap.DebugLevel, "check for debug level before setting high verbosity")
+	if checkedEntry != nil {
+		args = append(args, "-vvv")
+	}
+
+	inputPath, err := nonBasicLatinCharactersGuard(logger, inputPath)
+	if err != nil {
+		return fmt.Errorf("non-basic latin characters guard: %w", err)
+	}
+
+	args = append(args, "--output", outputPath, inputPath)
+
+	cmd, err := gotenberg.CommandContext(ctx, logger, p.arguments.unoBinPath, args...)
+	if err != nil {
+		return fmt.Errorf("create uno command: %w", err)
+	}
+
+	exitCode, err := cmd.Exec()
+	if err == nil {
+		return nil
+	}
+
+	// LibreOffice's errors are not explicit.
+	// That's why we have to make an educated guess according to the exit code
+	// and given inputs.
+	if exitCode == 5 {
+		return ErrMalformedPageRanges
+	}
+
+	// Possible errors:
+	// 1. LibreOffice failed for some reason.
+	// 2. Context done.
+	//
+	// On the second scenario, LibreOffice might not have time to remove some
+	// of its temporary files, as it has been killed without warning. The
+	// garbage collector will delete them for us (if the module is loaded).
+	return fmt.Errorf("convert to DOCX: %w", err)
 }
 
 // LibreOffice cannot convert a file with a name containing non-basic Latin

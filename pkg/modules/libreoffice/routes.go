@@ -172,3 +172,68 @@ func convertRoute(libreOffice libreofficeapi.Uno, engine gotenberg.PdfEngine) ap
 		},
 	}
 }
+
+// convertRouteDocx returns an [api.Route] which can convert LibreOffice documents
+// to DOCX.
+func convertRouteDocx(libreOffice libreofficeapi.Uno) api.Route {
+	return api.Route{
+		Method:      http.MethodPost,
+		Path:        "/forms/libreoffice/convert/docx",
+		IsMultipart: true,
+		Handler: func(c echo.Context) error {
+			ctx := c.Get("context").(*api.Context)
+
+			// Let's get the data from the form and validate them.
+			var (
+				inputPaths       []string
+			)
+
+			err := ctx.FormData().
+				MandatoryPaths(libreOffice.Extensions(), &inputPaths).
+				Validate()
+			if err != nil {
+				return fmt.Errorf("validate form data: %w", err)
+			}
+
+			// Alright, let's convert each document to DOCX.
+			outputPaths := make([]string, len(inputPaths))
+			for i, inputPath := range inputPaths {
+				outputPaths[i] = ctx.GeneratePath(".docx")
+
+				err = libreOffice.Docx(ctx, ctx.Log(), inputPath, outputPaths[i])
+				if err != nil {
+					return api.WrapError(
+						fmt.Errorf("convert to DOCX: %w", err),
+						api.NewSentinelHttpError(
+							http.StatusInternalServerError,
+							"Error",
+						),
+					)
+				}
+			}
+
+			if len(outputPaths) > 1 {
+				// If .zip archive, document.hwp -> document.hwp.docx.
+				for i, inputPath := range inputPaths {
+					outputPath := fmt.Sprintf("%s.docx", inputPath)
+
+					err = ctx.Rename(outputPaths[i], outputPath)
+					if err != nil {
+						return fmt.Errorf("rename output path: %w", err)
+					}
+
+					outputPaths[i] = outputPath
+				}
+			}
+			
+			// Last but not least, add the output paths to the context so that
+			// the API is able to send them as a response to the client.
+			err = ctx.AddOutputPaths(outputPaths...)
+			if err != nil {
+				return fmt.Errorf("add output paths: %w", err)
+			}
+
+			return nil
+		},
+	}
+}

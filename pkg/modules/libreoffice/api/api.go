@@ -67,6 +67,7 @@ type Options struct {
 // Uno is an abstraction on top of the Universal Network Objects API.
 type Uno interface {
 	Pdf(ctx context.Context, logger *zap.Logger, inputPath, outputPath string, options Options) error
+	Docx(ctx context.Context, logger *zap.Logger, inputPath, outputPath string) error
 	Extensions() []string
 }
 
@@ -267,6 +268,13 @@ func (a *Api) LibreOffice() (Uno, error) {
 func (a *Api) Pdf(ctx context.Context, logger *zap.Logger, inputPath, outputPath string, options Options) error {
 	return a.supervisor.Run(ctx, logger, func() error {
 		return a.libreOffice.pdf(ctx, logger, inputPath, outputPath, options)
+	})
+}
+
+// Docx converts a document to DOCX.
+func (a *Api) Docx(ctx context.Context, logger *zap.Logger, inputPath, outputPath string) error {
+	return a.supervisor.Run(ctx, logger, func() error {
+		return a.libreOffice.docx(ctx, logger, inputPath, outputPath)
 	})
 }
 

@@ -160,6 +160,80 @@ tests-once: ## Run the tests once (prefer the "tests" command while developing)
 	$(DOCKER_REPOSITORY)/gotenberg:$(GOTENBERG_VERSION)-tests \
 	gotest
 
+.PHONY: build-debug
+build-debug: ## Build the debug' Docker image
+	docker build \
+	--build-arg GOLANG_VERSION=$(GOLANG_VERSION) \
+	--build-arg GOTENBERG_VERSION=$(GOTENBERG_VERSION) \
+	--build-arg GOTENBERG_USER_GID=$(GOTENBERG_USER_GID) \
+	--build-arg GOTENBERG_USER_UID=$(GOTENBERG_USER_UID) \
+	--build-arg NOTO_COLOR_EMOJI_VERSION=$(NOTO_COLOR_EMOJI_VERSION) \
+	--build-arg PDFTK_VERSION=$(PDFTK_VERSION) \
+	-t $(DOCKER_REPOSITORY)/gotenberg:$(GOTENBERG_VERSION)-debug \
+	-f test/Dockerfile.debug .
+
+DLV_PORT=4000
+
+.PHONY: debug
+debug: ## Start the debuging environment
+	docker run --rm -it \
+	-p $(API_PORT):$(API_PORT) \
+	-p $(DLV_PORT):$(DLV_PORT) \
+	-e GOTENBERG_API_BASIC_AUTH_USERNAME=$(GOTENBERG_API_BASIC_AUTH_USERNAME) \
+	-e GOTENBERG_API_BASIC_AUTH_PASSWORD=$(GOTENBERG_API_BASIC_AUTH_PASSWORD) \
+	$(DOCKER_REPOSITORY)/gotenberg:$(GOTENBERG_VERSION)-debug \
+	/go/bin/dlv --listen=:4000 --headless=true --log=true --accept-multiclient --api-version=2 exec /usr/bin/gotenberg -- \
+	--gotenberg-graceful-shutdown-duration=$(GOTENBERG_GRACEFUL_SHUTDOWN_DURATION) \
+	--api-port=$(API_PORT) \
+	--api-port-from-env=$(API_PORT_FROM_ENV) \
+	--api-start-timeout=$(API_START_TIMEOUT) \
+	--api-timeout=$(API_TIMEOUT) \
+	--api-root-path=$(API_ROOT_PATH) \
+	--api-trace-header=$(API_TRACE_HEADER) \
+	--api-enable-basic-auth=$(API_ENABLE_BASIC_AUTH) \
+	--api-disable-health-check-logging=$(API_DISABLE_HEALTH_CHECK_LOGGING) \
+	--chromium-restart-after=$(CHROMIUM_RESTART_AFTER) \
+	--chromium-auto-start=$(CHROMIUM_AUTO_START) \
+	--chromium-max-queue-size=$(CHROMIUM_MAX_QUEUE_SIZE) \
+	--chromium-start-timeout=$(CHROMIUM_START_TIMEOUT) \
+	--chromium-incognito=$(CHROMIUM_INCOGNITO) \
+	--chromium-allow-insecure-localhost=$(CHROMIUM_ALLOW_INSECURE_LOCALHOST) \
+	--chromium-ignore-certificate-errors=$(CHROMIUM_IGNORE_CERTIFICATE_ERRORS) \
+	--chromium-disable-web-security=$(CHROMIUM_DISABLE_WEB_SECURITY) \
+	--chromium-allow-file-access-from-files=$(CHROMIUM_ALLOW_FILE_ACCESS_FROM_FILES) \
+	--chromium-host-resolver-rules=$(CHROMIUM_HOST_RESOLVER_RULES) \
+	--chromium-proxy-server=$(CHROMIUM_PROXY_SERVER) \
+	--chromium-allow-list="$(CHROMIUM_ALLOW_LIST)" \
+	--chromium-deny-list="$(CHROMIUM_DENY_LIST)" \
+	--chromium-clear-cache=$(CHROMIUM_CLEAR_CACHE) \
+	--chromium-clear-cookies=$(CHROMIUM_CLEAR_COOKIES) \
+	--chromium-disable-javascript=$(CHROMIUM_DISABLE_JAVASCRIPT) \
+	--chromium-disable-routes=$(CHROMIUM_DISABLE_ROUTES) \
+	--libreoffice-restart-after=$(LIBREOFFICE_RESTART_AFTER) \
+	--libreoffice-max-queue-size=$(LIBREOFFICE_MAX_QUEUE_SIZE) \
+	--libreoffice-auto-start=$(LIBREOFFICE_AUTO_START) \
+	--libreoffice-start-timeout=$(LIBREOFFICE_START_TIMEOUT) \
+	--libreoffice-disable-routes=$(LIBREOFFICE_DISABLE_ROUTES) \
+	--log-level=$(LOG_LEVEL) \
+	--log-format=$(LOG_FORMAT) \
+	--log-fields-prefix=$(LOG_FIELDS_PREFIX) \
+	--pdfengines-engines=$(PDFENGINES_ENGINES) \
+	--pdfengines-disable-routes=$(PDFENGINES_DISABLE_ROUTES) \
+	--prometheus-namespace=$(PROMETHEUS_NAMESPACE) \
+	--prometheus-collect-interval=$(PROMETHEUS_COLLECT_INTERVAL) \
+	--prometheus-disable-route-logging=$(PROMETHEUS_DISABLE_ROUTE_LOGGING) \
+	--prometheus-disable-collect=$(PROMETHEUS_DISABLE_COLLECT) \
+	--webhook-allow-list="$(WEBHOOK_ALLOW_LIST)" \
+	--webhook-deny-list="$(WEBHOOK_DENY_LIST)" \
+	--webhook-error-allow-list=$(WEBHOOK_ERROR_ALLOW_LIST) \
+	--webhook-error-deny-list=$(WEBHOOK_ERROR_DENY_LIST) \
+	--webhook-max-retry=$(WEBHOOK_MAX_RETRY) \
+	--webhook-retry-min-wait=$(WEBHOOK_RETRY_MIN_WAIT) \
+	--webhook-retry-max-wait=$(WEBHOOK_RETRY_MAX_WAIT) \
+	--webhook-client-timeout=$(WEBHOOK_CLIENT_TIMEOUT) \
+	--webhook-disable=$(WEBHOOK_DISABLE)
+
+
 # go install mvdan.cc/gofumpt@latest
 # go install github.com/daixiang0/gci@latest
 .PHONY: fmt
